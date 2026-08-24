@@ -1,6 +1,17 @@
 import axios from "axios";
 import { Platform } from "react-native";
-import type { MenuRequest, MenuResponse } from "../types/menu";
+import type {
+  AuthResponse,
+  Favorite,
+  GenerateMenuRequest,
+  Meal,
+  MenuHistoryDetail,
+  MenuHistorySummary,
+  MenuResponse,
+  Profile,
+  ProfilePreferences,
+  RegenerateMealRequest,
+} from "../types/menu";
 
 /**
  * Endereço do backend. Em desenvolvimento:
@@ -20,19 +31,19 @@ export const apiClient = axios.create({
   timeout: 60_000, // geração de cardápio via IA pode levar alguns segundos
 });
 
-export async function generateMenu(
-  request: MenuRequest
-): Promise<MenuResponse> {
-  try {
-    const { data } = await apiClient.post<MenuResponse>(
-      "/api/menu/generate",
-      request
-    );
-    return data;
-  } catch (err) {
-    throw new Error(extractErrorMessage(err));
-  }
+/** Token atual, injetado pelo AuthContext assim que o usuário loga / abre o app. */
+let currentToken: string | null = null;
+export function setAuthToken(token: string | null) {
+  currentToken = token;
 }
+
+apiClient.interceptors.request.use((config) => {
+  if (currentToken) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${currentToken}`;
+  }
+  return config;
+});
 
 /**
  * Tenta extrair a mensagem amigável que o backend devolve no corpo do erro
@@ -51,5 +62,104 @@ function extractErrorMessage(err: unknown): string {
     if (body?.error) return body.error;
     return err.message;
   }
-  return err instanceof Error ? err.message : "Erro desconhecido ao gerar o cardápio.";
+  return err instanceof Error ? err.message : "Erro desconhecido.";
+}
+
+async function request<T>(fn: () => Promise<{ data: T }>): Promise<T> {
+  try {
+    const { data } = await fn();
+    return data;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+/* ---------------------------------- Auth --------------------------------- */
+
+export function register(email: string, password: string): Promise<AuthResponse> {
+  return request(() => apiClient.post("/api/auth/register", { email, password }));
+}
+
+export function login(email: string, password: string): Promise<AuthResponse> {
+  return request(() => apiClient.post("/api/auth/login", { email, password }));
+}
+
+/* -------------------------------- Profiles -------------------------------- */
+
+export async function listProfiles(): Promise<Profile[]> {
+  const { profiles } = await request<{ profiles: Profile[] }>(() =>
+    apiClient.get("/api/profiles")
+  );
+  return profiles;
+}
+
+export async function createProfile(
+  data: ProfilePreferences & { isPrimary?: boolean }
+): Promise<Profile> {
+  const { profile } = await request<{ profile: Profile }>(() =>
+    apiClient.post("/api/profiles", data)
+  );
+  return profile;
+}
+
+export async function updateProfile(
+  id: string,
+  data: Partial<ProfilePreferences>
+): Promise<Profile> {
+  const { profile } = await request<{ profile: Profile }>(() =>
+    apiClient.put(`/api/profiles/${id}`, data)
+  );
+  return profile;
+}
+
+export function deleteProfile(id: string): Promise<void> {
+  return request(() => apiClient.delete(`/api/profiles/${id}`));
+}
+
+/* ---------------------------------- Menu ---------------------------------- */
+
+export function generateMenu(
+  req: GenerateMenuRequest
+): Promise<{ menu: MenuResponse; historyId: string }> {
+  return request(() => apiClient.post("/api/menu/generate", req));
+}
+
+export function regenerateMeal(
+  req: RegenerateMealRequest
+): Promise<{ meal: Meal; menu: MenuResponse }> {
+  return request(() => apiClient.post("/api/menu/regenerate-meal", req));
+}
+
+export async function listMenuHistory(): Promise<MenuHistorySummary[]> {
+  const { history } = await request<{ history: MenuHistorySummary[] }>(() =>
+    apiClient.get("/api/menu/history")
+  );
+  return history;
+}
+
+export async function getMenuHistoryDetail(id: string): Promise<MenuHistoryDetail> {
+  const { history } = await request<{ history: MenuHistoryDetail }>(() =>
+    apiClient.get(`/api/menu/history/${id}`)
+  );
+  return history;
+}
+
+/* -------------------------------- Favorites -------------------------------- */
+
+export async function listFavorites(): Promise<Favorite[]> {
+  const { favorites } = await request<{ favorites: Favorite[] }>(() =>
+    apiClient.get("/api/favorites")
+  );
+  return favorites;
+}
+
+export async function addFavorite(meal: Meal): Promise<Favorite> {
+  const { favorite } = await request<{ favorite: Favorite }>(() =>
+    apiClient.post("/api/favorites", { meal })
+  );
+  return favorite;
+}
+
+export function removeFavorite(id: string): Promise<void> {
+  return request(() => apiClient.delete(`/api/favorites/${id}`));
 }

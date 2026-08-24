@@ -4,13 +4,17 @@ import type { Meal } from "../types/menu";
 export type MainTabParamList = {
   WeeklyMenu: undefined;
   Pantry: undefined;
+  Favorites: undefined;
+  History: undefined;
   Profile: undefined;
 };
 
 export type RootStackParamList = {
   Onboarding: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList>;
-  MealDetail: { dayLabel: string; meal: Meal };
+  MealDetail: { dayLabel: string; meal: Meal; fromCurrentMenu?: boolean };
+  ProfileForm: { profileId?: string };
+  HistoryDetail: { historyId: string };
 };
 
 declare global {

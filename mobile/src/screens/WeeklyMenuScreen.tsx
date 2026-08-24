@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -20,16 +21,33 @@ type Props = CompositeScreenProps<
 >;
 
 export function WeeklyMenuScreen({ navigation }: Props) {
-  const { profile, menu, isGeneratingMenu, menuError, regenerateMenu } =
+  const { activeProfile, menu, isGeneratingMenu, menuError, regenerateMenu } =
     useAppContext();
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   const selectedDay = menu?.days[selectedDayIndex];
 
+  async function handleShareMenu() {
+    if (!menu) return;
+    const shoppingListText = menu.shoppingList
+      .map((i) => `- ${i.quantity} de ${i.name}`)
+      .join("\n");
+    try {
+      await Share.share({
+        message: `Cardápio da semana (NutriWeek)\n\n${menu.summary}\n\nCusto estimado: R$ ${menu.estimatedWeeklyCostBRL.toFixed(2)}\nMédia: ${Math.round(menu.avgDailyCalories)} kcal/dia\n\nLista de compras:\n${shoppingListText}`,
+      });
+    } catch {
+      // usuário cancelou
+    }
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Cardápio da semana</Text>
+        <View>
+          <Text style={styles.title}>Cardápio da semana</Text>
+          {activeProfile && <Text style={styles.profileLabel}>Perfil: {activeProfile.name}</Text>}
+        </View>
         <Pressable
           style={styles.generateButton}
           onPress={() => regenerateMenu()}
@@ -45,7 +63,7 @@ export function WeeklyMenuScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
-      {!profile && (
+      {!activeProfile && (
         <Text style={styles.warning}>
           Complete seu perfil para gerar um cardápio personalizado.
         </Text>
@@ -65,6 +83,9 @@ export function WeeklyMenuScreen({ navigation }: Props) {
                 🔥 {Math.round(menu.avgDailyCalories)} kcal/dia
               </Text>
             </View>
+            <Pressable style={styles.shareLink} onPress={handleShareMenu}>
+              <Text style={styles.shareLinkText}>Compartilhar cardápio e lista de compras</Text>
+            </Pressable>
           </View>
 
           <ScrollView
@@ -103,6 +124,7 @@ export function WeeklyMenuScreen({ navigation }: Props) {
                   navigation.navigate("MealDetail", {
                     dayLabel: selectedDay.dayLabel,
                     meal,
+                    fromCurrentMenu: true,
                   })
                 }
               />
@@ -111,7 +133,7 @@ export function WeeklyMenuScreen({ navigation }: Props) {
         </>
       )}
 
-      {!menu && !isGeneratingMenu && profile && (
+      {!menu && !isGeneratingMenu && activeProfile && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
             Você ainda não tem um cardápio gerado. Toque em "Gerar cardápio"
@@ -133,6 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: { fontSize: 22, fontWeight: "800", color: "#0F5132" },
+  profileLabel: { fontSize: 12, color: "#6B7280", marginTop: 2 },
   generateButton: {
     backgroundColor: "#0F5132",
     borderRadius: 10,
@@ -167,6 +190,8 @@ const styles = StyleSheet.create({
   summaryText: { fontSize: 13, color: "#374151", marginBottom: 8 },
   summaryRow: { flexDirection: "row", gap: 16 },
   summaryMetric: { fontSize: 13, fontWeight: "700", color: "#0F5132" },
+  shareLink: { marginTop: 10 },
+  shareLinkText: { fontSize: 12, color: "#0F5132", fontWeight: "600" },
   dayTabs: { flexGrow: 0, marginBottom: 12 },
   dayTab: {
     paddingVertical: 8,

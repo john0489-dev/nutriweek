@@ -1,19 +1,63 @@
-import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/types";
 import { MEAL_TYPE_LABELS } from "../types/menu";
+import { useAppContext } from "../context/AppContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "MealDetail">;
 
-export function MealDetailScreen({ route }: Props) {
-  const { dayLabel, meal } = route.params;
+export function MealDetailScreen({ route, navigation }: Props) {
+  const { dayLabel, meal, fromCurrentMenu } = route.params;
+  const { isMealFavorited, toggleFavorite, regenerateOneMeal, isRegeneratingMeal } =
+    useAppContext();
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const favorited = isMealFavorited(meal);
+
+  async function handleToggleFavorite() {
+    setFavoriteBusy(true);
+    try {
+      await toggleFavorite(meal);
+    } catch (err) {
+      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível favoritar.");
+    } finally {
+      setFavoriteBusy(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    try {
+      await regenerateOneMeal(dayLabel, meal.type);
+      navigation.goBack();
+    } catch (err) {
+      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível regenerar.");
+    }
+  }
+
+  async function handleShare() {
+    const ingredientsText = meal.ingredients
+      .map((i) => `- ${i.quantity} de ${i.name}`)
+      .join("\n");
+    const stepsText = meal.instructions.map((s, i) => `${i + 1}. ${s}`).join("\n");
+    try {
+      await Share.share({
+        message: `${meal.name} (${MEAL_TYPE_LABELS[meal.type]} — ${dayLabel})\n\n${meal.description}\n\nIngredientes:\n${ingredientsText}\n\nModo de preparo:\n${stepsText}\n\nGerado com NutriWeek`,
+      });
+    } catch {
+      // usuário cancelou o share, sem problema
+    }
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.day}>
-        {dayLabel} · {MEAL_TYPE_LABELS[meal.type]}
-      </Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.day}>
+          {dayLabel} · {MEAL_TYPE_LABELS[meal.type]}
+        </Text>
+        <Pressable onPress={handleToggleFavorite} disabled={favoriteBusy} hitSlop={8}>
+          <Text style={styles.favoriteIcon}>{favorited ? "❤️" : "🤍"}</Text>
+        </Pressable>
+      </View>
       <Text style={styles.title}>{meal.name}</Text>
       <Text style={styles.description}>{meal.description}</Text>
 
@@ -25,10 +69,7 @@ export function MealDetailScreen({ route }: Props) {
       </View>
 
       <InfoRow label="Tempo de preparo" value={`${meal.prepTimeMinutes} min`} />
-      <InfoRow
-        label="Custo estimado"
-        value={`R$ ${meal.estimatedCostBRL.toFixed(2)}`}
-      />
+      <InfoRow label="Custo estimado" value={`R$ ${meal.estimatedCostBRL.toFixed(2)}`} />
 
       <Text style={styles.sectionTitle}>Ingredientes</Text>
       {meal.ingredients.map((ing, i) => (
@@ -44,6 +85,25 @@ export function MealDetailScreen({ route }: Props) {
           {i + 1}. {step}
         </Text>
       ))}
+
+      <View style={styles.actionsRow}>
+        <Pressable style={styles.secondaryButton} onPress={handleShare}>
+          <Text style={styles.secondaryButtonText}>Compartilhar</Text>
+        </Pressable>
+        {fromCurrentMenu && (
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={handleRegenerate}
+            disabled={isRegeneratingMeal}
+          >
+            {isRegeneratingMeal ? (
+              <ActivityIndicator size="small" color="#0F5132" />
+            ) : (
+              <Text style={styles.secondaryButtonText}>Regenerar essa refeição</Text>
+            )}
+          </Pressable>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -69,6 +129,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F3F4F6" },
   content: { padding: 20, paddingBottom: 40 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   day: {
     fontSize: 12,
     fontWeight: "700",
@@ -76,6 +137,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 6,
   },
+  favoriteIcon: { fontSize: 24 },
   title: { fontSize: 24, fontWeight: "800", color: "#111827", marginBottom: 8 },
   description: { fontSize: 14, color: "#4B5563", marginBottom: 16 },
   macroRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
@@ -98,12 +160,15 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 13, color: "#6B7280" },
   infoValue: { fontSize: 13, fontWeight: "700", color: "#111827" },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-    marginTop: 20,
-    marginBottom: 8,
-  },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", marginTop: 20, marginBottom: 8 },
   listItem: { fontSize: 14, color: "#374151", marginBottom: 6, lineHeight: 20 },
+  actionsRow: { marginTop: 24, gap: 10 },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: "#0F5132",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  secondaryButtonText: { color: "#0F5132", fontWeight: "700", fontSize: 14 },
 });

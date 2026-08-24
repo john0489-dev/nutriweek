@@ -1,8 +1,12 @@
 import { getAnthropicClient, getModelName } from "./anthropicClient";
 import {
+  Meal,
+  MealSchema,
+  MealType,
   MenuRequest,
   MenuResponse,
   MenuResponseSchema,
+  UserProfile,
 } from "../types/menu";
 
 const SYSTEM_PROMPT = `Você é um nutricionista e chef experiente que monta cardápios semanais no Brasil.
@@ -99,6 +103,99 @@ export async function generateMenu(req: MenuRequest): Promise<MenuResponse> {
   }
 
   const parsed = MenuResponseSchema.safeParse(parsedUnknown);
+  if (!parsed.success) {
+    throw new Error(
+      `JSON da IA não bateu com o schema esperado: ${parsed.error.message}`
+    );
+  }
+
+  return parsed.data;
+}
+
+export interface RegenerateMealInput {
+  profile: UserProfile;
+  pantryItems: string[];
+  dayLabel: string;
+  mealType: MealType;
+  /** Nomes das outras refeições já presentes na semana, pra IA evitar repetir. */
+  otherMealNames: string[];
+  notes?: string;
+}
+
+const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  cafe_da_manha: "café da manhã",
+  almoco: "almoço",
+  lanche: "lanche da tarde",
+  jantar: "jantar",
+};
+
+function buildRegenerateMealPrompt(input: RegenerateMealInput): string {
+  const { profile, pantryItems, dayLabel, mealType, otherMealNames, notes } =
+    input;
+
+  return `Substitua APENAS o(a) ${MEAL_TYPE_LABELS[mealType]} de ${dayLabel} por uma nova opção. Não gere o resto da semana.
+
+Perfil do usuário:
+- Objetivo: ${profile.goal}
+- Pessoas na casa: ${profile.householdSize}
+- Restrições alimentares: ${profile.restrictions.join(", ") || "nenhuma"}
+- Alergias: ${profile.allergies.join(", ") || "nenhuma"}
+- Alimentos que não gosta: ${profile.dislikedFoods.join(", ") || "nenhum"}
+${profile.weeklyBudgetBRL ? `- Orçamento semanal: R$ ${profile.weeklyBudgetBRL}` : ""}
+
+Ingredientes já disponíveis em casa (use-os prioritariamente quando fizer sentido):
+${pantryItems.length ? pantryItems.join(", ") : "nenhum informado"}
+
+Refeições que já existem no restante da semana (não repita nenhuma delas):
+${otherMealNames.length ? otherMealNames.join(", ") : "nenhuma"}
+
+${notes ? `Observação do usuário sobre essa troca: ${notes}` : ""}
+
+Responda SOMENTE com um objeto JSON representando essa ÚNICA refeição, no formato:
+{
+  "type": "${mealType}",
+  "name": string,
+  "description": string,
+  "ingredients": [{ "name": string, "quantity": string }],
+  "instructions": [string],
+  "calories": number,
+  "proteinG": number,
+  "carbsG": number,
+  "fatG": number,
+  "estimatedCostBRL": number,
+  "prepTimeMinutes": number,
+  "usesPantryItems": [string]
+}`;
+}
+
+export async function regenerateSingleMeal(
+  input: RegenerateMealInput
+): Promise<Meal> {
+  const anthropic = getAnthropicClient();
+
+  const message = await anthropic.messages.create({
+    model: getModelName(),
+    max_tokens: 2000,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: buildRegenerateMealPrompt(input) }],
+  });
+
+  const textBlock = message.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("A IA não retornou conteúdo de texto.");
+  }
+
+  const jsonText = extractJson(textBlock.text);
+  let parsedUnknown: unknown;
+  try {
+    parsedUnknown = JSON.parse(jsonText);
+  } catch (err) {
+    throw new Error(
+      `Falha ao interpretar JSON retornado pela IA: ${(err as Error).message}`
+    );
+  }
+
+  const parsed = MealSchema.safeParse(parsedUnknown);
   if (!parsed.success) {
     throw new Error(
       `JSON da IA não bateu com o schema esperado: ${parsed.error.message}`
