@@ -23,9 +23,33 @@ export const apiClient = axios.create({
 export async function generateMenu(
   request: MenuRequest
 ): Promise<MenuResponse> {
-  const { data } = await apiClient.post<MenuResponse>(
-    "/api/menu/generate",
-    request
-  );
-  return data;
+  try {
+    const { data } = await apiClient.post<MenuResponse>(
+      "/api/menu/generate",
+      request
+    );
+    return data;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+/**
+ * Tenta extrair a mensagem amigável que o backend devolve no corpo do erro
+ * (ex: "Falha ao gerar cardápio com a IA: ..."), em vez do texto genérico
+ * do axios (ex: "Request failed with status code 502").
+ */
+function extractErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    if (!err.response) {
+      return "Não foi possível conectar ao servidor. Verifique se o backend está rodando e se o endereço configurado (EXPO_PUBLIC_API_URL) está correto.";
+    }
+    const body = err.response.data as
+      | { error?: string; message?: string }
+      | undefined;
+    if (body?.message) return body.message;
+    if (body?.error) return body.error;
+    return err.message;
+  }
+  return err instanceof Error ? err.message : "Erro desconhecido ao gerar o cardápio.";
 }
