@@ -16,7 +16,10 @@ cd "$(dirname "$0")"
 
 echo "==> [1/4] Instalando dependências do mobile"
 cd mobile
-npm install
+# npm ci (em vez de npm install) respeita o package-lock.json à risca —
+# evita que o instalador reresolva versões (o que já causou um conflito de
+# peer dependency do react-dom em produção que não acontecia localmente).
+npm ci
 
 echo "==> [2/4] Exportando o app mobile para web (build de produção)"
 # EXPO_PUBLIC_API_URL="" faz o app usar caminhos relativos (/api/...),
@@ -28,7 +31,7 @@ cd ..
 
 echo "==> [3/4] Instalando dependências do backend e compilando TypeScript"
 cd backend
-npm install
+npm ci
 npm run build
 cd ..
 
