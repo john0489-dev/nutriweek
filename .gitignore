@@ -1,1 +1,5 @@
 _setup_tmp/
+**/node_modules/
+**/_node_modules_broken_delete_me/
+**/dist/
+backend/public/

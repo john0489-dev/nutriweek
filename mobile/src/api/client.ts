@@ -18,6 +18,14 @@ import type {
  * - Android emulator usa 10.0.2.2 para apontar para o "localhost" da máquina host.
  * - iOS simulator e web usam localhost diretamente.
  * - Em um device físico, troque pelo IP da sua máquina na rede local (ex: http://192.168.0.10:3333).
+ *
+ * Em produção (build web servido pelo próprio backend, ver render-build.sh):
+ * o build é gerado com `EXPO_PUBLIC_API_URL=""`. Como string vazia não é
+ * "nullish", o `??` abaixo NÃO cai no DEV_BASE_URL — API_BASE_URL vira "" e
+ * o axios passa a montar todas as chamadas como caminhos relativos
+ * (ex: "/api/menu/generate"), resolvidos pelo navegador contra a própria
+ * origem da página. Ou seja: mesmo domínio/porta do backend, sem CORS e sem
+ * precisar saber a URL de produção em tempo de build.
  */
 const DEV_BASE_URL = Platform.select({
   android: "http://10.0.2.2:3333",

@@ -45,7 +45,7 @@ menuRouter.post("/generate", async (req: AuthenticatedRequest, res) => {
   }
 
   const { profileId, pantryItems, daysRequested, notes } = parsed.data;
-  const profile = db.findProfile(req.userId!, profileId);
+  const profile = await db.findProfile(req.userId!, profileId);
   if (!profile) {
     return res.status(404).json({ error: "Perfil não encontrado" });
   }
@@ -57,7 +57,7 @@ menuRouter.post("/generate", async (req: AuthenticatedRequest, res) => {
       daysRequested,
       notes,
     });
-    const history = db.addMenuHistory({
+    const history = await db.addMenuHistory({
       userId: req.userId!,
       profileId: profile.id,
       profileName: profile.name,
@@ -86,11 +86,11 @@ menuRouter.post("/regenerate-meal", async (req: AuthenticatedRequest, res) => {
   }
   const { historyId, dayLabel, mealType, notes } = parsed.data;
 
-  const history = db.findMenuHistory(req.userId!, historyId);
+  const history = await db.findMenuHistory(req.userId!, historyId);
   if (!history) {
     return res.status(404).json({ error: "Cardápio não encontrado no histórico" });
   }
-  const profile = db.findProfile(req.userId!, history.profileId);
+  const profile = await db.findProfile(req.userId!, history.profileId);
   if (!profile) {
     return res.status(404).json({ error: "Perfil do cardápio não encontrado" });
   }
@@ -125,7 +125,7 @@ menuRouter.post("/regenerate-meal", async (req: AuthenticatedRequest, res) => {
       ),
     };
 
-    const saved = db.updateMenuHistory(req.userId!, historyId, updatedResponse);
+    const saved = await db.updateMenuHistory(req.userId!, historyId, updatedResponse);
     return res.json({ meal: newMeal, menu: saved?.response });
   } catch (err) {
     console.error("[menu.regenerate-meal] erro:", err);
@@ -137,8 +137,8 @@ menuRouter.post("/regenerate-meal", async (req: AuthenticatedRequest, res) => {
 });
 
 /** GET /api/menu/history — lista resumida dos cardápios já gerados. */
-menuRouter.get("/history", (req: AuthenticatedRequest, res) => {
-  const history = db.listMenuHistory(req.userId!).map((h) => ({
+menuRouter.get("/history", async (req: AuthenticatedRequest, res) => {
+  const history = (await db.listMenuHistory(req.userId!)).map((h) => ({
     id: h.id,
     createdAt: h.createdAt,
     profileId: h.profileId,
@@ -151,8 +151,8 @@ menuRouter.get("/history", (req: AuthenticatedRequest, res) => {
 });
 
 /** GET /api/menu/history/:id — detalhe completo de um cardápio gerado antes. */
-menuRouter.get("/history/:id", (req: AuthenticatedRequest, res) => {
-  const history = db.findMenuHistory(req.userId!, req.params.id);
+menuRouter.get("/history/:id", async (req: AuthenticatedRequest, res) => {
+  const history = await db.findMenuHistory(req.userId!, req.params.id);
   if (!history) {
     return res.status(404).json({ error: "Cardápio não encontrado" });
   }

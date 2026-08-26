@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: nutriweek
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: bash render-build.sh
+    startCommand: node backend/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-5
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nutriweek-db
+          property: connectionString
+
+databases:
+  - name: nutriweek-db
+    plan: free
+    region: oregon

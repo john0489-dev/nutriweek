@@ -19,12 +19,12 @@ authRouter.post("/register", async (req, res) => {
   }
   const { email, password } = parsed.data;
 
-  if (db.findUserByEmail(email)) {
+  if (await db.findUserByEmail(email)) {
     return res.status(409).json({ error: "Já existe uma conta com esse e-mail" });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = db.createUser(email, passwordHash);
+  const user = await db.createUser(email, passwordHash);
   const token = signToken(toPublicUser(user));
 
   return res.status(201).json({ token, user: toPublicUser(user) });
@@ -39,7 +39,7 @@ authRouter.post("/login", async (req, res) => {
   }
   const { email, password } = parsed.data;
 
-  const user = db.findUserByEmail(email);
+  const user = await db.findUserByEmail(email);
   if (!user) {
     return res.status(401).json({ error: "E-mail ou senha incorretos" });
   }
