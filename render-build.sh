@@ -32,6 +32,7 @@ cd ..
 echo "==> [3/4] Instalando dependências do backend e compilando TypeScript"
 cd backend
 npm ci
+echo "==> node: $(node --version) | npm: $(npm --version) | typescript: $(./node_modules/.bin/tsc --version)"
 npm run build
 cd ..
 
