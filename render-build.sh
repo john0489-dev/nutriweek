@@ -32,7 +32,9 @@ cd ..
 echo "==> [3/4] Instalando dependências do backend e compilando TypeScript"
 cd backend
 npm ci
-echo "==> node: $(node --version) | npm: $(npm --version) | typescript: $(node -e "console.log(require('./node_modules/typescript/package.json').version)")"
+echo "==> pwd: $(pwd) | node: $(node --version) | npm: $(npm --version)"
+echo "==> typescript package.json:"
+cat node_modules/typescript/package.json | grep '"version"' || echo "NAO ENCONTRADO em node_modules/typescript/package.json"
 npm run build
 cd ..
 
