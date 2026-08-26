@@ -1,8 +1,15 @@
+# Plano free em ambos os serviços: sem custo, mas com limitações -
+# o web service "dorme" depois de ~15min sem tráfego (o primeiro acesso
+# depois disso demora alguns segundos pra "acordar") e o banco free do
+# Render expira depois de 90 dias (dá pra recriar, mas perde os dados).
+# Pra produção "de verdade" sem esses limites, troque o "plan: free" do
+# service abaixo por "starter" — o Render vai pedir um cartão salvo, então
+# essa troca deve ser feita direto no dashboard, não por aqui.
 services:
   - type: web
     name: nutriweek
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     buildCommand: bash render-build.sh
     startCommand: node backend/dist/index.js
